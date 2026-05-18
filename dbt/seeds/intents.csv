@@ -1,0 +1,8 @@
+intent,intent_label,category,priority
+booking,Booking,transactional,medium
+complaint,Complaint,negative,high
+inquiry,Inquiry,informational,low
+emergency,Emergency,urgent,critical
+cancellation,Cancellation,transactional,medium
+follow_up,Follow Up,informational,low
+other,Other,uncategorized,low

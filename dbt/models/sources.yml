@@ -1,0 +1,35 @@
+version: 2
+
+sources:
+  - name: voiceops
+    database: voiceops
+    schema: public
+    tables:
+      - name: call_extractions
+        description: "Silver layer: LLM-enriched call data"
+        columns:
+          - name: call_id
+            tests: [unique, not_null]
+          - name: business_id
+            tests:
+              - not_null
+              - relationships:
+                  to: source('voiceops', 'businesses')
+                  field: business_id
+          - name: intent
+            tests:
+              - accepted_values:
+                  values: ['booking', 'complaint', 'inquiry', 'emergency', 'cancellation', 'follow_up', 'other']
+
+      - name: businesses
+        description: "Tenant dimension table"
+        columns:
+          - name: business_id
+            tests: [unique, not_null]
+          - name: vertical
+            tests:
+              - accepted_values:
+                  values: ['plumbing', 'auto_repair', 'property_management']
+
+      - name: dlq_events
+        description: "Dead letter queue tracking"

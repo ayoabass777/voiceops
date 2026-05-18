@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoiceOps Architecture — AWAP + PIPEDA</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0F172A;font-family:'SF Mono','Fira Code',monospace;padding:20px;color:#E2E8F0}
+.page{max-width:1100px;margin:0 auto}
+h1{font-size:20px;color:#F8FAFC;text-align:center;margin-bottom:4px}
+.subtitle{font-size:10px;color:#64748B;text-align:center;margin-bottom:24px;letter-spacing:2px;text-transform:uppercase}
+.toggle-row{display:flex;justify-content:center;gap:4px;margin-bottom:20px;flex-wrap:wrap}
+.toggle-btn{background:#1E293B;border:1.5px solid #334155;border-radius:8px;padding:8px 16px;font-family:inherit;font-size:11px;color:#94A3B8;cursor:pointer;font-weight:600;letter-spacing:0.5px;transition:all .2s}
+.toggle-btn.active{background:#8B5CF6;border-color:#8B5CF6;color:#fff}
+.toggle-btn:hover:not(.active){border-color:#8B5CF6;color:#C4B5FD}
+.view{display:none}.view.active{display:block}
+.zone{border:1.5px dashed;border-radius:12px;padding:14px 18px;margin-bottom:14px}
+.zone-label{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:12px;font-weight:700}
+.zone-hot{border-color:#3B82F6;background:rgba(59,130,246,.05)}.zone-hot .zone-label{color:#60A5FA}
+.zone-cold{border-color:#8B5CF6;background:rgba(139,92,246,.04)}.zone-cold .zone-label{color:#A78BFA}
+.zone-cloud{border-color:#F59E0B;background:rgba(245,158,11,.04)}.zone-cloud .zone-label{color:#FBBF24}
+.zone-pii{border-color:#EF4444;background:rgba(239,68,68,.04)}.zone-pii .zone-label{color:#F87171}
+.zone-scale{border-color:#10B981;background:rgba(16,185,129,.04)}.zone-scale .zone-label{color:#34D399}
+.flow{display:flex;flex-direction:column;align-items:center;gap:0}
+.arrow-down{color:#64748B;font-size:20px;line-height:1;padding:3px 0}
+.handoff{font-size:9px;color:#64748B;letter-spacing:1px;padding:2px 0;text-align:center}
+.node{border-radius:10px;padding:12px 20px;text-align:center;min-width:240px;position:relative}
+.node-title{font-weight:700;font-size:13px;color:#fff}
+.node-sub{font-size:10px;margin-top:3px;opacity:.85}
+.node-detail{font-size:9px;margin-top:2px;opacity:.65}
+.node-badge{display:inline-block;background:rgba(255,255,255,.12);border-radius:4px;padding:2px 8px;font-size:8px;margin-top:4px;letter-spacing:.5px}
+.producer{background:#065F46;border:1.5px solid #10B981}.producer .node-sub{color:#A7F3D0}
+.kafka{background:#4C1D95;border:1.5px solid #8B5CF6}.kafka .node-sub,.kafka .node-detail{color:#DDD6FE}
+.consumer-node{background:#78350F;border:1.5px solid #F59E0B}.consumer-node .node-sub,.consumer-node .node-detail{color:#FDE68A}
+.archiver-node{background:#065F46;border:1.5px solid #10B981}.archiver-node .node-sub,.archiver-node .node-detail{color:#A7F3D0}
+.postgres{background:#1E3A8A;border:1.5px solid #3B82F6}.postgres .node-sub{color:#BFDBFE}
+.s3-node{background:#065F46;border:1.5px solid #10B981}.s3-node .node-sub,.s3-node .node-detail{color:#A7F3D0}
+.dbt-node{background:#9A3412;border:1.5px solid #FB923C}.dbt-node .node-sub{color:#FED7AA}
+.dlq{background:#450A0A;border:1.5px solid #EF4444}.dlq .node-sub{color:#FECACA}
+.llm-api{background:#1E3A5F;border:1.5px dashed #3B82F6}.llm-api .node-sub{color:#93C5FD}
+.audit-gate{background:#7C2D12;border:2px solid #F97316;min-width:280px}.audit-gate .node-title{color:#FED7AA;font-size:11px}.audit-gate .node-sub{color:#FDBA74;font-size:9px}
+.observer-node{background:#1E293B;border:1.5px solid #6366F1}.observer-node .node-sub{color:#A5B4FC}
+.pii-boundary{background:rgba(239,68,68,.1);border:2px dashed #EF4444;border-radius:10px;padding:10px;margin:8px 0}
+.pii-label{font-size:8px;color:#F87171;letter-spacing:2px;text-transform:uppercase;text-align:center;margin-bottom:6px;font-weight:700}
+.hot-row{display:flex;align-items:center;justify-content:center;gap:10px}
+.hot-box{background:#1E3A5F;border:1.5px solid #3B82F6;border-radius:8px;padding:8px 24px;color:#93C5FD;font-weight:700;font-size:13px}
+.hot-arrow{color:#3B82F6;font-size:16px}
+.split-row{display:flex;align-items:flex-start;justify-content:center;gap:24px;flex-wrap:wrap}
+.split-branch{display:flex;flex-direction:column;align-items:center;gap:0}
+.branch-label{font-size:8px;color:#64748B;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;font-weight:700}
+.side-arrow{color:#64748B;font-size:12px;min-width:32px;text-align:center}
+.side-arrow.fail{color:#EF4444}.side-arrow.api{color:#3B82F6}
+.consumer-row{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap}
+.docker-border{border:1px dashed #475569;border-radius:14px;padding:16px 12px;position:relative;margin-top:8px}
+.docker-label{position:absolute;top:-9px;right:16px;background:#0F172A;padding:0 8px;font-size:9px;color:#64748B;letter-spacing:1.5px;font-weight:600}
+.info-note{background:rgba(139,92,246,.1);border:1px solid #8B5CF6;border-radius:8px;padding:10px 14px;margin-top:10px}
+.info-note-title{font-size:9px;color:#A78BFA;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}
+.info-note-text{font-size:10px;color:#C4B5FD;line-height:1.6}
+.map-table{width:100%;border-collapse:collapse;margin-top:10px}
+.map-table th{font-size:8px;color:#64748B;letter-spacing:1.5px;text-transform:uppercase;text-align:left;padding:6px 10px;border-bottom:1px solid #334155}
+.map-table td{font-size:11px;padding:8px 10px;border-bottom:1px solid #1E293B}
+.map-table td:first-child{color:#94A3B8}.map-table td:nth-child(2){color:#FBBF24;font-weight:600}.map-table td:nth-child(3){color:#64748B;font-size:9px}
+.scale-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.scale-card{background:#1E293B;border:1px solid #334155;border-radius:8px;padding:12px 14px}
+.scale-card-title{font-size:10px;color:#34D399;font-weight:700}
+.scale-card-desc{font-size:9px;color:#94A3B8;margin-top:5px;line-height:1.6}
+.partition-visual{display:flex;gap:3px;margin:8px 0 4px;justify-content:center;flex-wrap:wrap}
+.partition-box{border-radius:4px;padding:3px 8px;font-size:8px;font-weight:700}
+.p-archiver{background:#065F46;border:1px solid #10B981;color:#A7F3D0}
+.p-extractor{background:#78350F;border:1px solid #F59E0B;color:#FDE68A}
+.dbt-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.dbt-card{background:#1E293B;border:1px solid #334155;border-radius:8px;padding:10px 14px}
+.dbt-card-label{font-size:8px;color:#64748B;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;font-weight:600}
+.dbt-card-title{font-size:11px;color:#FB923C;font-weight:700}
+.dbt-card-desc{font-size:9px;color:#94A3B8;margin-top:3px;line-height:1.5}
+.dbt-flow{display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.dbt-stage{background:#9A3412;border-radius:6px;padding:5px 12px;font-size:10px;color:#FED7AA;font-weight:600}
+.dbt-arrow{color:#FB923C;font-size:12px}
+</style>
+</head>
+<body>
+<div class="page">
+<h1>VoiceOps</h1>
+<div class="subtitle">AWAP Audit Pattern · PIPEDA Compliance · Streaming Analytics</div>
+
+<div class="toggle-row">
+<button class="toggle-btn active" onclick="toggle('awap',this)">AWAP Pipeline</button>
+<button class="toggle-btn" onclick="toggle('cloud',this)">Production (AWS)</button>
+<button class="toggle-btn" onclick="toggle('dbt',this)">dbt (Multi-tenant)</button>
+<button class="toggle-btn" onclick="toggle('scale',this)">Scaling</button>
+<button class="toggle-btn" onclick="toggle('pipeda',this)">PIPEDA</button>
+</div>
+
+<!-- AWAP VIEW -->
+<div id="awap" class="view active">
+<div class="zone zone-hot">
+<div class="zone-label">Hot Path — Voice System (simulated)</div>
+<div class="hot-row">
+<div class="hot-box">STT</div><span class="hot-arrow">→</span>
+<div class="hot-box">LLM</div><span class="hot-arrow">→</span>
+<div class="hot-box">TTS</div>
+</div>
+</div>
+<div class="handoff">▼ call-completed event (status=closed, consent=true)</div>
+<div class="zone zone-cold">
+<div class="zone-label">Cold Path — AWAP Audit Pattern</div>
+<div class="docker-border">
+<div class="docker-label">docker-compose up</div>
+<div class="flow">
+
+<div class="node producer">
+<div class="node-title">Producer</div>
+<div class="node-sub">LLM-generated transcripts + customer_hash</div>
+</div>
+<div class="arrow-down">▼</div>
+
+<div class="consumer-row">
+<div class="node dlq" style="min-width:140px"><div class="node-title" style="font-size:11px">DLQ: Ingestion</div><div class="node-sub" style="font-size:8px">voiceops.dlq.ingestion</div></div>
+<div class="side-arrow fail">✗ ←</div>
+<div class="node audit-gate">
+<div class="node-title">⛊ AUDIT 1 — Ingestion Gate</div>
+<div class="node-sub">UUID format · known tenant · consent=true · timestamps valid · duration cross-check · transcript non-empty</div>
+</div>
+</div>
+<div class="arrow-down">▼ PASS</div>
+
+<div class="node kafka">
+<div class="node-title">Kafka</div>
+<div class="node-sub">voiceops.calls (6 partitions, key=business_id)</div>
+</div>
+<div class="arrow-down">▼</div>
+<div class="handoff">two consumer groups + observer — same topic, independent offsets</div>
+
+<div class="split-row">
+<!-- Archiver -->
+<div class="split-branch">
+<div class="branch-label">Consumer Group: archiver</div>
+<div class="consumer-row">
+<div class="node dlq" style="min-width:100px"><div class="node-title" style="font-size:10px">DLQ</div><div class="node-sub" style="font-size:8px">dlq.archiver</div></div>
+<div class="side-arrow fail">✗←</div>
+<div class="node audit-gate" style="min-width:200px">
+<div class="node-title">⛊ AUDIT 2a — Archiver Gate</div>
+<div class="node-sub">Type castable · required fields · safe for Parquet</div>
+</div>
+</div>
+<div class="arrow-down">▼ PASS</div>
+<div class="node archiver-node">
+<div class="node-title">Archiver</div>
+<div class="node-sub">Batch → Parquet (500/file, flush 60s)</div>
+</div>
+<div class="arrow-down">▼</div>
+<div class="node s3-node">
+<div class="node-title">S3 Bronze</div>
+<div class="node-sub">Full PII · encrypted · 90-day retention</div>
+<div class="node-badge">PIPEDA: restricted access</div>
+</div>
+</div>
+
+<!-- Extractor -->
+<div class="split-branch">
+<div class="branch-label">Consumer Group: extractor</div>
+<div class="pii-boundary">
+<div class="pii-label">⚠ PII Boundary — scrub before write</div>
+<div class="consumer-row">
+<div class="node consumer-node" style="min-width:240px">
+<div class="node-title">Extractor</div>
+<div class="node-sub">Consent check → LLM extraction → PII strip</div>
+<div class="node-detail">customer_hash only — no raw phone to Postgres</div>
+</div>
+<div class="side-arrow api">⇄</div>
+<div class="node llm-api" style="min-width:110px">
+<div class="node-title" style="font-size:11px">LLM API</div>
+<div class="node-sub" style="font-size:8px">Bedrock ca-central-1</div>
+</div>
+</div>
+<div class="arrow-down">▼</div>
+<div class="consumer-row">
+<div class="node dlq" style="min-width:100px"><div class="node-title" style="font-size:10px">DLQ</div><div class="node-sub" style="font-size:8px">dlq.extractor</div></div>
+<div class="side-arrow fail">✗←</div>
+<div class="node audit-gate" style="min-width:220px">
+<div class="node-title">⛊ AUDIT 2b — Extractor Gate</div>
+<div class="node-sub">Schema valid · confidence scored · PII leak detection</div>
+</div>
+</div>
+</div>
+<div class="arrow-down">▼ PASS</div>
+<div class="node postgres">
+<div class="node-title">Postgres Silver</div>
+<div class="node-sub">PII-scrubbed · customer_hash only</div>
+<div class="node-badge">PIPEDA: no raw PII in analytics layer</div>
+</div>
+<div class="arrow-down">▼</div>
+<div class="node dbt-node" style="min-width:300px">
+<div class="node-title">dbt Gold</div>
+<div class="node-sub">stg → fct_call_metrics → agg_daily_business_summary</div>
+</div>
+</div>
+
+<!-- Observer -->
+<div class="split-branch">
+<div class="branch-label">Consumer Group: observer</div>
+<div class="node observer-node" style="min-width:150px">
+<div class="node-title">Observer</div>
+<div class="node-sub">Throughput · latency · DLQ rates · consumer lag · tenant distribution</div>
+</div>
+<div class="arrow-down">▼</div>
+<div class="node postgres" style="min-width:150px">
+<div class="node-title" style="font-size:12px">pipeline_metrics</div>
+<div class="node-sub" style="font-size:8px">→ agg_pipeline_health</div>
+</div>
+</div>
+</div>
+
+<div class="info-note" style="margin-top:14px">
+<div class="info-note-title">Backfill path</div>
+<div class="info-note-text">Read S3 bronze → republish to <strong>voiceops.backfill</strong> → same Extractor code, different topic. Throttle to avoid LLM overload.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- CLOUD VIEW -->
+<div id="cloud" class="view">
+<div class="zone zone-hot">
+<div class="zone-label">Hot Path — Voice System (their infra)</div>
+<div class="hot-row"><div class="hot-box">STT</div><span class="hot-arrow">→</span><div class="hot-box">LLM</div><span class="hot-arrow">→</span><div class="hot-box">TTS</div></div>
+</div>
+<div class="handoff">▼ call-complete webhook</div>
+
+<div class="zone zone-cloud">
+<div class="zone-label">Production — AWS ca-central-1 (PIPEDA · Terraform/CDK)</div>
+<div class="flow">
+
+<div class="consumer-row">
+<div class="node producer" style="position:relative"><div style="position:absolute;top:-8px;right:10px;background:#FBBF24;color:#78350F;font-size:7px;font-weight:700;padding:1px 5px;border-radius:3px">LAMBDA</div>
+<div class="node-title">Producer</div>
+<div class="node-sub">Webhook → Schema Registry → Audit 1</div>
+<div class="node-detail">Event-driven, zero idle cost</div>
+</div>
+<div class="side-arrow api">→</div>
+<div class="node" style="background:#1E293B;border:1.5px solid #6366F1;min-width:150px;position:relative"><div style="position:absolute;top:-8px;right:10px;background:#FBBF24;color:#78350F;font-size:7px;font-weight:700;padding:1px 5px;border-radius:3px">GLUE REGISTRY</div>
+<div class="node-title" style="font-size:11px">Schema Registry</div>
+<div class="node-sub" style="color:#A5B4FC;font-size:9px">JSON Schema enforcement</div>
+</div>
+</div>
+<div class="arrow-down">▼</div>
+
+<div class="node kafka" style="position:relative"><div style="position:absolute;top:-8px;right:10px;background:#FBBF24;color:#78350F;font-size:7px;font-weight:700;padding:1px 5px;border-radius:3px">MSK SERVERLESS</div>
+<div class="node-title">Kafka</div>
+<div class="node-sub">voiceops.calls (6 partitions, key=business_id)</div>
+<div class="node-detail">Managed · auto-scaling · TLS in transit</div>
+</div>
+<div class="arrow-down">▼</div>
+<div class="handoff">three consumer groups — independent scaling</div>
+
+<div class="split-row">
+
+<div class="split-branch">
+<div class="branch-label">Archiver (1-2 tasks)</div>
+<div class="node archiver-node" style="position:relative"><div style="position:absolute;top:-8px;right:10px;background:#FBBF24;color:#78350F;font-size:7px;font-weight:700;padding:1px 5px;border-radius:3px">ECS FARGATE</div>
+<div class="node-title">Archiver</div>
+<div class="node-sub">Audit 2a → batch Parquet</div>
+</div>
+<div class="arrow-down">▼</div>
+<div class="node s3-node" style="position:relative"><div style="position:absolute;top:-8px;right:10px;background:#FBBF24;color:#78350F;font-size:7px;font-weight:700;padding:1px 5px;border-radius:3px">S3 · SSE-KMS</div>
+<div class="node-title">Bronze Layer</div>
+<div class="node-sub">Full PII · encrypted · 90d retention</div>
+<div class="node-detail">→ Glacier → delete 1yr · Athena queries</div>
+</div>
+</div>
+
+<div class="split-branch">
+<div class="branch-label">Extractor (auto-scaled)</div>
+<div class="pii-boundary">
+<div class="pii-label">⚠ PII Boundary</div>
+<div class="consumer-row">
+<div class="node consumer-node" style="position:relative;min-width:200px"><div style="position:absolute;top:-8px;right:10px;background:#FBBF24;color:#78350F;font-size:7px;font-weight:700;padding:1px 5px;border-radius:3px">ECS FARGATE (3-6)</div>
+<div class="node-title">Extractor</div>
+<div class="node-sub">Audit 2b + PII strip</div>
+<div class="node-detail">CloudWatch lag → autoscale</div>
+</div>
+<div class="side-arrow api">⇄</div>
+<div class="node llm-api" style="min-width:120px;position:relative"><div style="position:absolute;top:-8px;right:10px;background:#FBBF24;color:#78350F;font-size:7px;font-weight:700;padding:1px 5px;border-radius:3px">BEDROCK</div>
+<div class="node-title" style="font-size:11px">LLM API</div>
+<div class="node-sub" style="font-size:8px">ca-central-1 (Montreal)</div>
+<div class="node-badge">PIPEDA: data in Canada</div>
+</div>
+</div>
+</div>
+<div class="arrow-down">▼</div>
+<div class="node postgres" style="position:relative"><div style="position:absolute;top:-8px;right:10px;background:#FBBF24;color:#78350F;font-size:7px;font-weight:700;padding:1px 5px;border-radius:3px">RDS POSTGRES</div>
+<div class="node-title">Silver + Gold</div>
+<div class="node-sub">PII-scrubbed · encrypted · SSL</div>
+<div class="node-detail">Write primary + read replica for dbt</div>
+</div>
+<div class="arrow-down">▼</div>
+<div class="node dbt-node" style="position:relative;min-width:240px"><div style="position:absolute;top:-8px;right:10px;background:#FBBF24;color:#78350F;font-size:7px;font-weight:700;padding:1px 5px;border-radius:3px">ECS FARGATE / MWAA</div>
+<div class="node-title">dbt</div>
+<div class="node-sub">Scheduled transforms</div>
+</div>
+</div>
+
+<div class="split-branch">
+<div class="branch-label">Observer (1 task)</div>
+<div class="node observer-node" style="position:relative;min-width:130px"><div style="position:absolute;top:-8px;right:10px;background:#FBBF24;color:#78350F;font-size:7px;font-weight:700;padding:1px 5px;border-radius:3px">ECS FARGATE</div>
+<div class="node-title">Observer</div>
+<div class="node-sub">→ CloudWatch + pipeline_metrics</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div style="margin-top:14px">
+<table class="map-table">
+<tr><th>Local</th><th>AWS</th><th>Why</th></tr>
+<tr><td>Kafka container</td><td>MSK Serverless</td><td>No broker ops, pay-per-throughput</td></tr>
+<tr><td>Schema Registry</td><td>Glue Schema Registry</td><td>Managed, integrates with MSK</td></tr>
+<tr><td>Local Parquet</td><td>S3 (SSE-KMS)</td><td>Durable, cheap, Athena queries</td></tr>
+<tr><td>Postgres container</td><td>RDS Postgres</td><td>Managed backups, read replicas, SSL</td></tr>
+<tr><td>Archiver</td><td>ECS Fargate (1-2)</td><td>Low compute, batch I/O</td></tr>
+<tr><td>Extractor</td><td>ECS Fargate (3-6)</td><td>Auto-scale on consumer lag</td></tr>
+<tr><td>Observer</td><td>ECS Fargate (1)</td><td>Lightweight metrics</td></tr>
+<tr><td>Producer</td><td>Lambda</td><td>Event-driven, zero idle</td></tr>
+<tr><td>dbt CLI</td><td>ECS Fargate / MWAA</td><td>Scheduled transforms</td></tr>
+<tr><td>LLM (mock)</td><td>Bedrock ca-central-1</td><td>PIPEDA: data in Canada</td></tr>
+<tr><td>Docker Compose</td><td>Terraform / CDK</td><td>IaC, reproducible</td></tr>
+</table>
+</div>
+</div>
+</div>
+
+<!-- DBT VIEW -->
+<div id="dbt" class="view">
+<div class="zone" style="border-color:#FB923C;background:rgba(251,146,60,.04)">
+<div class="zone-label" style="color:#FB923C">dbt — Multi-tenant Analytics + Pipeline Health</div>
+<div class="dbt-flow">
+<div class="dbt-stage">staging</div><div class="dbt-arrow">→</div>
+<div class="dbt-stage">facts & dims</div><div class="dbt-arrow">→</div>
+<div class="dbt-stage">aggregates</div>
+</div>
+<div class="dbt-grid">
+<div class="dbt-card"><div class="dbt-card-label">Staging</div><div class="dbt-card-title">stg_call_extractions</div><div class="dbt-card-desc">Joins extractions + businesses. Computes latency diagnostics. <strong style="color:#A78BFA">business_id on every row.</strong></div></div>
+<div class="dbt-card"><div class="dbt-card-label">Dimension</div><div class="dbt-card-title">dim_businesses</div><div class="dbt-card-desc">Seed: business_id, name, vertical. Slicing by industry for platform analytics.</div></div>
+<div class="dbt-card"><div class="dbt-card-label">Dimension</div><div class="dbt-card-title">dim_intents</div><div class="dbt-card-desc">Intent taxonomy: booking · complaint · inquiry · emergency · cancellation · follow_up</div></div>
+<div class="dbt-card"><div class="dbt-card-label">Fact</div><div class="dbt-card-title">fct_call_metrics</div><div class="dbt-card-desc">One row per call. <strong style="color:#A78BFA">confidence ≥ 0.7 filter.</strong> Grain: one call, one tenant.</div></div>
+<div class="dbt-card" style="grid-column:1/-1"><div class="dbt-card-label">Aggregate — Tenant View</div><div class="dbt-card-title">agg_daily_business_summary</div><div class="dbt-card-desc"><strong style="color:#FBBF24">Customer dashboard:</strong> per business/day — calls, resolution %, sentiment, top intents, emergencies.</div></div>
+<div class="dbt-card" style="grid-column:1/-1"><div class="dbt-card-label">Aggregate — Platform View</div><div class="dbt-card-title">agg_daily_vertical_summary</div><div class="dbt-card-desc"><strong style="color:#FBBF24">Internal team:</strong> per vertical/day — where to improve agent prompts?</div></div>
+<div class="dbt-card" style="grid-column:1/-1"><div class="dbt-card-label">Aggregate — Ops</div><div class="dbt-card-title">agg_dlq_health + agg_pipeline_health</div><div class="dbt-card-desc"><strong style="color:#F87171">Pipeline monitoring:</strong> DLQ rates per gate (ingestion/archiver/extractor), failure types, throughput, latency. &lt;2% healthy, &gt;5% alert.</div></div>
+</div>
+</div>
+</div>
+
+<!-- SCALING VIEW -->
+<div id="scale" class="view">
+<div class="zone zone-scale">
+<div class="zone-label">Kafka Partition Scaling — Consumer Group Model</div>
+<div style="text-align:center;margin-bottom:12px">
+<div style="font-size:11px;color:#E2E8F0;font-weight:700">voiceops.calls — 6 partitions, key=business_id</div>
+<div style="font-size:9px;color:#64748B;margin-top:3px">Same partitions, three consumer groups, independent offsets</div>
+</div>
+<div class="scale-grid">
+<div class="scale-card"><div class="scale-card-title">Group: "archiver" (1-2)</div><div class="scale-card-desc">Bottleneck: S3 write I/O (~50ms/batch)<div class="partition-visual"><span class="partition-box p-archiver">P0</span><span class="partition-box p-archiver">P1</span><span class="partition-box p-archiver">P2</span><span class="partition-box p-archiver">P3</span><span class="partition-box p-archiver">P4</span><span class="partition-box p-archiver">P5</span></div><div style="text-align:center;font-size:8px;color:#64748B">1 Archiver handles all 6</div></div></div>
+<div class="scale-card"><div class="scale-card-title">Group: "extractor" (3-6)</div><div class="scale-card-desc">Bottleneck: LLM API (~2s/call)<div class="partition-visual"><span class="partition-box p-extractor">P0→A</span><span class="partition-box p-extractor">P1→A</span><span class="partition-box p-extractor">P2→B</span><span class="partition-box p-extractor">P3→B</span><span class="partition-box p-extractor">P4→C</span><span class="partition-box p-extractor">P5→C</span></div><div style="text-align:center;font-size:8px;color:#64748B">3 Extractors, 2 partitions each</div></div></div>
+<div class="scale-card"><div class="scale-card-title">Group: "observer" (1)</div><div class="scale-card-desc">Lightweight metrics collector. Reads all partitions. Writes to pipeline_metrics. Never needs to scale — it's measuring, not computing.</div></div>
+<div class="scale-card"><div class="scale-card-title">Fargate Autoscaling</div><div class="scale-card-desc">Consumer lag &gt; 1000 → scale Extractors 2→6<br>Consumer lag &lt; 100 → scale back to 2<br><br>9am spike → lag grows → more Extractors → lag drains → scale down midnight.</div></div>
+</div>
+<div class="scale-card" style="background:#1E293B;border:1px solid #334155;border-radius:8px;padding:12px;margin-top:12px">
+<div class="scale-card-title">Throughput Math</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:6px;font-size:9px;color:#94A3B8">
+<div><div style="color:#FDE68A;font-weight:700">1 Extractor</div>~1,800/hr<br>small platform</div>
+<div><div style="color:#FDE68A;font-weight:700">3 Extractors</div>~5,400/hr<br>medium</div>
+<div><div style="color:#FDE68A;font-weight:700">6 Extractors</div>~10,800/hr<br>1000+ tenants</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- PIPEDA VIEW -->
+<div id="pipeda" class="view">
+<div class="zone zone-pii">
+<div class="zone-label">PIPEDA Compliance — Data Flow</div>
+<div class="dbt-grid">
+<div class="dbt-card" style="border-color:#EF4444"><div class="dbt-card-label" style="color:#F87171">Consent</div><div class="dbt-card-title" style="color:#F87171">Gate at Audit 1</div><div class="dbt-card-desc">consent_obtained=false → event rejected before Kafka. No consent, no processing, no storage. Voice system responsible for obtaining consent.</div></div>
+<div class="dbt-card" style="border-color:#EF4444"><div class="dbt-card-label" style="color:#F87171">PII Minimization</div><div class="dbt-card-title" style="color:#F87171">Bronze/Silver Split</div><div class="dbt-card-desc"><strong>Bronze (S3):</strong> full PII — transcript, phone, names. Encrypted, restricted, 90-day retention.<br><strong>Silver (Postgres):</strong> scrubbed — customer_hash only. No raw phone. LLM prompted: "the caller" not real names.</div></div>
+<div class="dbt-card" style="border-color:#EF4444"><div class="dbt-card-label" style="color:#F87171">PII Leak Detection</div><div class="dbt-card-title" style="color:#F87171">Audit 2b Guardrail</div><div class="dbt-card-desc">Regex scanner on LLM output: phone patterns, name prefixes (Mr./Mrs.), street addresses. Leak detected → DLQ, not Postgres. Catches what the prompt missed.</div></div>
+<div class="dbt-card" style="border-color:#EF4444"><div class="dbt-card-label" style="color:#F87171">Data Sovereignty</div><div class="dbt-card-title" style="color:#F87171">LLM in Canada</div><div class="dbt-card-desc">Production: AWS Bedrock ca-central-1 (Montreal). PII never leaves Canada. Demo: mock extractor (no external calls). Fallback: local model (Ollama/vLLM).</div></div>
+<div class="dbt-card" style="border-color:#EF4444"><div class="dbt-card-label" style="color:#F87171">Right to Deletion</div><div class="dbt-card-title" style="color:#F87171">customer_hash Lookup</div><div class="dbt-card-desc">Customer requests deletion → DELETE FROM call_extractions WHERE customer_hash = ?. Bronze S3: rewrite Parquet excluding matching rows. DLQ: purge matching call_ids. Index on customer_hash enables fast lookup.</div></div>
+<div class="dbt-card" style="border-color:#EF4444"><div class="dbt-card-label" style="color:#F87171">Encryption + Retention</div><div class="dbt-card-title" style="color:#F87171">At Rest + In Transit</div><div class="dbt-card-desc">S3: SSE-KMS. Postgres: RDS encryption. Kafka: TLS. All connections: SSL/HTTPS.<br><br>Retention: Kafka 7d, Bronze 90d→Glacier→delete 1yr, Silver 2yr, DLQ 90d.</div></div>
+</div>
+</div>
+</div>
+
+</div>
+<script>
+function toggle(v,b){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.toggle-btn').forEach(x=>x.classList.remove('active'));document.getElementById(v).classList.add('active');b.classList.add('active')}
+</script>
+</body>
+</html>

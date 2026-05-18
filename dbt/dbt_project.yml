@@ -1,0 +1,15 @@
+name: 'voiceops'
+version: '1.0.0'
+config-version: 2
+profile: 'voiceops'
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  voiceops:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table

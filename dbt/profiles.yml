@@ -1,0 +1,12 @@
+voiceops:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: localhost
+      port: 5433
+      user: voiceops
+      password: voiceops
+      dbname: voiceops
+      schema: public
+      threads: 4
