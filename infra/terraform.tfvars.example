@@ -1,0 +1,6 @@
+# Copy to terraform.tfvars and fill in values
+aws_region     = "ca-central-1"
+s3_bucket_name = "voiceops-bronze-YOURNAME"   # must be globally unique
+db_username    = "voiceops"
+db_password    = "CHANGE_ME_strong_password_123"
+my_ip_cidr     = "YOUR_IP/32"                 # run: curl -s ifconfig.me

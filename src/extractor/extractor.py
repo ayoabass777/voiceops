@@ -17,6 +17,9 @@ from confluent_kafka import Consumer, Producer, KafkaError
 
 from extraction import extract, validate_extraction
 
+from dotenv import load_dotenv
+load_dotenv(dotenv_path="../../.env")
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",

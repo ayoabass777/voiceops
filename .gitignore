@@ -5,5 +5,33 @@ data/
 target/
 dbt_packages/
 logs/
+dbt_modules/
 *.egg-info/
 .DS_Store
+
+# Python
+*.egg
+*.whl
+venv/
+.venv/
+*.so
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+crash.log
+
+# AWS
+awscliv2/
+
+# Project context (local only)
+CLAUDE.md

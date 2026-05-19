@@ -17,6 +17,9 @@ from confluent_kafka import Producer
 
 from templates import BUSINESS_TEMPLATES
 
+from dotenv import load_dotenv
+load_dotenv(dotenv_path="../../.env")
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",

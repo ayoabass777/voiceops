@@ -3,10 +3,10 @@ voiceops:
   outputs:
     dev:
       type: postgres
-      host: localhost
-      port: 5433
+      host: voiceops-silver.cdeykgc4iivg.ca-central-1.rds.amazonaws.com
+      port: 5432
       user: voiceops
-      password: voiceops
+      password: testing_voiceops
       dbname: voiceops
       schema: public
       threads: 4
